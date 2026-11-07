@@ -46,6 +46,7 @@ td input{-webkit-user-select:text;user-select:text}
 .muted{color:var(--mut);font-size:12px;margin-top:8px;line-height:1.6}
 .add{width:100%;margin-top:8px}
 h2{font-size:16px;margin:16px 0 8px}
+textarea{width:100%;height:90px;margin-top:8px;padding:8px;border:1px solid var(--b);border-radius:8px;background:var(--bg);color:var(--tx);font-size:12px;font-family:monospace;direction:ltr;text-align:left}
 </style>
 </head>
 <body>
@@ -53,6 +54,22 @@ h2{font-size:16px;margin:16px 0 8px}
 <div class="wk"><button class="sec" onclick="moveWk(-7)">→ قبل</button><b id="wl"></b><button class="sec" onclick="moveWk(7)">بعد ←</button></div>
 <div class="tabs" id="tabs"></div>
 <div id="body"></div>
+<button class="sec add" style="margin-top:14px" onclick="bkToggle()">💾 نسخة احتياطية / استرجاع</button>
+<div id="bkp" style="display:none;margin-top:8px">
+  <div class="sum" style="padding:12px">
+    <b>1) خد نسخة من الأرقام</b>
+    <div class="muted">دوس "جهّز النسخة" ثم "نسخ"، وبعدين الصقها في أي مكان (رسالة لنفسك مثلا).</div>
+    <button class="sec add" onclick="bkMake()">جهّز النسخة</button>
+    <textarea id="bkOut" readonly></textarea>
+    <button class="sec add" onclick="bkCopy()">📋 نسخ</button>
+  </div>
+  <div class="sum" style="padding:12px;margin-top:10px">
+    <b>2) رجّع نسخة</b>
+    <div class="muted">الصق النسخة هنا ودوس "استرجاع". ده هيحل محل اللي موجود دلوقتي.</div>
+    <textarea id="bkIn" placeholder="الصق النسخة هنا"></textarea>
+    <button class="add" onclick="bkRestore()">استرجاع</button>
+  </div>
+</div>
 <script>
 var KEY="souq-v3",PKEY="souq-prices-v1",P={},db={},wk="",tab=0,NM=["الأربعاء","الخميس","الجمعة","السبت"];
 var FIXED=[["كنافة وجلاش",19],["رقائق جلاش",""],["البسبوسه",15],["السميد",23.5],["سمبوسه",33],["رقائق طري",26],["عيش كريب",""]];
@@ -240,6 +257,29 @@ function ch(i,k,v){
   if(k==="bp"||k==="sp"){var pk=nk(r.n);if(pk){P[pk]=P[pk]||{};P[pk][k]=v;saveP()}else r[k]=v}
   else{r[k]=v;if(k==="n"&&d.skip)delete d.skip[v.trim()]}
   save();if(k!=="n")calc();
+}
+function bkToggle(){var e=document.getElementById("bkp");e.style.display=e.style.display==="none"?"block":"none"}
+function bkMake(){
+  var d={};Object.keys(db).forEach(function(k){d[k]={rows:(db[k].rows||[]).filter(function(r){return !r.pend}),skip:db[k].skip||{}}});
+  document.getElementById("bkOut").value=JSON.stringify({v:1,db:d,P:P,PL:PL});
+}
+function bkCopy(){
+  var t=document.getElementById("bkOut");if(!t.value)bkMake();
+  t.select();t.setSelectionRange(0,t.value.length);
+  var ok=false;try{ok=document.execCommand("copy")}catch(e){}
+  if(!ok&&navigator.clipboard){navigator.clipboard.writeText(t.value).then(function(){alert("اتنسخت")},function(){alert("انسخ النص يدوي: دوس مطول جوه الخانة واختار نسخ")});return}
+  alert(ok?"اتنسخت":"انسخ النص يدوي: دوس مطول جوه الخانة واختار نسخ");
+}
+function bkRestore(){
+  var v=document.getElementById("bkIn").value.trim(),o;
+  try{o=JSON.parse(v)}catch(e){alert("النسخة مش مظبوطة، اتأكد إنك نسختها كلها");return}
+  if(!o||typeof o.db!=="object"||!Array.isArray(o.PL)){alert("النسخة مش مظبوطة");return}
+  if(!confirm("هيتم استبدال كل اللي موجود دلوقتي بالنسخة دي. متأكد؟"))return;
+  db=o.db;P=o.P||{};PL=o.PL;
+  try{localStorage.setItem("souq-list-v2","1");localStorage.setItem("souq-clear-v1","1")}catch(e){}
+  syncAll(true);savePL();saveP();save();tab=Math.min(tab,4);render();
+  document.getElementById("bkIn").value="";document.getElementById("bkp").style.display="none";
+  alert("اتسجّلت النسخة");
 }
 var skipNorm=false;
 function addRow(){getDay(tab).rows.push({n:"",q:"",bp:"",s:"",sp:"",pend:1});save();skipNorm=true;dayView();var t=document.querySelectorAll("td.name input");if(t.length){var l=t[t.length-1];l.scrollIntoView({block:"center"});l.focus()}}
